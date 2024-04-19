@@ -132,7 +132,7 @@ def main():
         sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = time.time()
+    timestamp = int(time.time())
 
     prev_hw_status = None
 
