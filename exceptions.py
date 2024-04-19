@@ -1,9 +1,3 @@
-class EnvVariableException(Exception):
-    """Отсутствие переменной окружения."""
-
-    pass
-
-
 class EndpointStatusException(Exception):
     """Ошибка обращения к эндпоинту."""
 
