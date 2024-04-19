@@ -10,7 +10,7 @@ import telegram
 from dotenv import load_dotenv
 
 from exceptions import (APIKeysException, EndpointStatusException,
-                        EnvVariableException, InvalidStatusException)
+                        InvalidStatusException)
 
 load_dotenv()
 
@@ -41,19 +41,11 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    try:
-        for var in (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
-            if not var:
-                raise EnvVariableException(
-                    'Проверьте переменные окружения: '
-                    'PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID'
-                )
-    except EnvVariableException as error:
-        logger.critical(
-            f'Сбой в работе программы: {error}. '
-            f'Работа программы принудительно остановлена.'
-        )
-        sys.exit()
+    return any(
+        [var is None for var in (
+            PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+        )]
+    )
 
 
 def send_message(bot, message):
@@ -77,8 +69,10 @@ def get_api_answer(timestamp: int):
             params={'from_date': timestamp})
         if response.status_code != HTTPStatus.OK:
             raise EndpointStatusException(
-                'Код ответа API не соответствует ожидаемому. '
-                f'{response.status_code}'
+                f'''Код ответа API не соответствует ожидаемому.
+Код ответа: {response.status_code}
+Параметры запроса: {response.url.split('?')[1]}
+Контент запроса: {response.text}'''
             )
         return response.json()
     except requests.RequestException as error:
@@ -90,15 +84,10 @@ def get_api_answer(timestamp: int):
 
 def check_response(response):
     """Проверяет ответ API на наличие ожидаемых ключей."""
-    if type(response) is not dict:
+    if not isinstance(response, dict):
         raise TypeError(
             f'Тип данных ответа API не соответствует ожидаемому. '
-            f'{type(response)}'
-        )
-
-    if not response.get('homeworks') and response.get('homeworks') != []:
-        raise APIKeysException(
-            'В ответе API отсутствует ключ - homeworks'
+            f'Полученный тип данных: {type(response)}'
         )
 
     elif response.get('homeworks') == []:
@@ -107,11 +96,10 @@ def check_response(response):
             'Возможно, бот только что был запущен.'
         )
 
-    homework_type = type(response.get('homeworks'))
-    if homework_type is not list:
+    if not isinstance(response.get('homeworks'), list):
         raise TypeError(
             f'Тип данных под ключом homeworks не соответствует ожидаемому. '
-            f'{homework_type}'
+            f'Полученный тип данных: {type(response.get("homeworks"))}'
         )
 
 
@@ -135,10 +123,16 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if check_tokens():
+        logger.critical(
+            'Программа принудительно остановлена. '
+            'Проверьте переменные окружения: '
+            'PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID'
+        )
+        sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
+    timestamp = 1710780557
 
     prev_hw_status = None
 
@@ -156,14 +150,10 @@ def main():
                     homework.get('status'), homework.get('homework_name')
                 )
                 send_message(bot, bot_message)
+            timestamp = response.get('current_date')
 
-        except EndpointStatusException as error:
-            logger.error(error)
-        except APIKeysException as error:
-            logger.error(error)
-        except TypeError as error:
-            logger.error(error)
-        except InvalidStatusException as error:
+        except (EndpointStatusException, APIKeysException,
+                TypeError, InvalidStatusException) as error:
             logger.error(error)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
