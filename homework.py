@@ -41,10 +41,8 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    return any(
-        [var is None for var in (
-            PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
-        )]
+    return all(
+        [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
     )
 
 
@@ -63,15 +61,16 @@ def send_message(bot, message):
 def get_api_answer(timestamp: int):
     """Делает запрос к API сервиса Практикум.Домашка."""
     try:
+        params = {'from_date': timestamp}
         response = requests.get(
             ENDPOINT,
             headers=HEADERS,
-            params={'from_date': timestamp})
+            params=params)
         if response.status_code != HTTPStatus.OK:
             raise EndpointStatusException(
                 f'''Код ответа API не соответствует ожидаемому.
 Код ответа: {response.status_code}
-Параметры запроса: {response.url.split('?')[1]}
+Параметры запроса: {params}
 Контент запроса: {response.text}'''
             )
         return response.json()
@@ -123,7 +122,7 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    if check_tokens():
+    if not check_tokens():
         logger.critical(
             'Программа принудительно остановлена. '
             'Проверьте переменные окружения: '
